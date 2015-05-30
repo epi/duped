@@ -1,0 +1,6 @@
+duped
+*.o
+*~
+duped.userprefs
+duped.dproj
+duped.sln
