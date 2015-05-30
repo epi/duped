@@ -57,12 +57,12 @@ Find all duplicate files in your home directory:
 
 Find all duplicate files in your home directory and delete those that end with `.bak` or `.backup`:
 
-    $ duped ~ -g '*.bak` -g `*.backup` -d
+    $ duped ~ -g '*.bak` -g '*.backup' -d
 
 Find duplicate files in directories */home/user/foo* and */home/user/bar* and move every duplicate
 from */home/user/bar* to */home/user/duplicates/*:
 
-    $ duped /home/user/foo /home/user/bar -g /home/user/bar -m /home/user/duplicates
+    $ duped /home/user/foo /home/user/bar -g '/home/user/bar/*' -m /home/user/duplicates
 
 ## Installation
 
