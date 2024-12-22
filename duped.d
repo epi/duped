@@ -45,25 +45,28 @@ ExcludeFilter[] excludeFilters;
 string[ulong][ulong] findFilesOfTheSameSize(string[] dirs)
 {
 	string[ulong][ulong] result;
-	foreach (dir; dirs)
-	{
-		foreach (DirEntry e; dirEntries(dir, SpanMode.depth, false))
-		{
-			foreach (filt; excludeFilters)
-				if (filt(e))
+
+	void scan(string dir) {
+		try {
+			foreach (DirEntry de; dirEntries(dir, SpanMode.shallow, false)) {
+				if (de.isSymlink || excludeFilters.map!(f => f(de)).any)
 					continue;
-			if (e.isDir)
-			{
-				if (verbose)
-					writeln("scanning ", e.name);
+				if (de.isDir) {
+					if (verbose)
+						writeln("scanning ", de.name);
+					scan(de.name);
+				} else if (de.isFile && de.size > 0) {
+					result[de.size][de.statBuf.st_ino] = de.name;
+				}
 			}
-			else if (e.isFile)
-			{
-				if (e.size > 0)
-					result[e.size][e.statBuf.st_ino] = e.name;
-			}
+		} catch (FileException ex) {
+			writefln("Error: %s", ex.msg);
 		}
 	}
+
+	foreach (dir; dirs)
+		scan(dir);
+
 	return result;
 }
 
@@ -104,7 +107,7 @@ struct FileInfo
 
 string[][] groupIdenticalFiles(string[] names)
 {
-	enum maxChunkSize = 65536;
+	enum maxChunkSize = 128 * 1024 * 1024; // * 1024 * 1024;
 
 	// at the beginning, assume all identical, i.e. place them in the same group
 	FileInfo[][] groups = [ names.map!(name => FileInfo(name)).array() ];
@@ -261,8 +264,11 @@ void main(string[] args)
 	size_t deletedFiles;
 	ulong deletedSize;
 	bool haveAllMatch = false;
-	foreach (size, names; namesBySize)
+	auto sizes = namesBySize.keys.sort();
+	sizes.reverse();
+	foreach (size; sizes)
 	{
+		auto names = namesBySize[size];
 		++processedSizes;
 		clearLine();
 		writef("Scanning... %d/%d: %d files of size %d", processedSizes, namesBySize.length, names.length, size);
@@ -272,7 +278,18 @@ void main(string[] args)
 		if (!names.values.any!(name => deleteGlobs.any!(glob => globMatch(name, glob))())())
 			continue;
 
-		auto groups = groupIdenticalFiles(names.values);
+		string[][] groups;
+		try
+		{
+			groups = groupIdenticalFiles(names.values);
+		}
+		catch (Exception e)
+		{
+			clearLine();
+			writeln("Error: ", e.msg);
+			continue;
+		}
+
 		foreach (group; groups)
 		{
 			Array!bool itemsToRemove;
